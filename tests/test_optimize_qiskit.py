@@ -316,6 +316,154 @@ def test_backend_note_added_when_provided() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Backend object inference
+# ---------------------------------------------------------------------------
+
+class _FakeIBMBackendV2:
+    """Minimal mock of a Qiskit BackendV2 with IBM-style gates."""
+
+    operation_names = ["rz", "sx", "x", "cx", "measure", "reset"]
+
+
+class _FakeIBMBackendV1:
+    """Minimal mock of a Qiskit BackendV1 with IBM-style gates (V1 API)."""
+
+    class _Cfg:
+        basis_gates = ["rz", "sx", "x", "cx", "measure"]
+
+    def configuration(self) -> "_Cfg":
+        return self._Cfg()
+
+
+class _FakeNonIBMBackend:
+    """Minimal mock of a backend that does NOT use IBM-native gates."""
+
+    operation_names = ["u3", "cx", "measure"]
+
+
+class _BrokenBackend:
+    """Mock that raises on every attribute access."""
+
+    def __getattr__(self, name: str) -> None:  # type: ignore[override]
+        raise RuntimeError("intentional failure")
+
+
+def test_ibm_backendv2_infers_ibm_basis() -> None:
+    """A BackendV2-style backend with sx+rz triggers ibm basis automatically."""
+    qc = QuantumCircuit(1)
+    qc.rx(0.5, 0)
+    qc.ry(0.3, 0)
+    qc.rz(0.2, 0)
+
+    result = optimize(qc, backend=_FakeIBMBackendV2(), return_metadata=True)
+
+    # Basis inferred as "ibm".
+    assert result.native_basis == "ibm"
+
+    # Circuit is still equivalent.
+    assert equal_up_to_phase(Operator(qc).data, Operator(result.circuit).data)
+
+    # Note mentions inference.
+    assert any("inferred" in note for note in result.notes)
+
+
+def test_ibm_backendv2_applies_ibm_gates_when_beneficial() -> None:
+    """IBM basis is actually emitted (rz/sx) when the run is long enough to benefit."""
+    qc = QuantumCircuit(1)
+    # 8-gate run: ZSX decomposition (≤5 gates) wins over keeping originals.
+    for _ in range(4):
+        qc.rx(0.3, 0)
+        qc.ry(0.2, 0)
+
+    result = optimize(qc, backend=_FakeIBMBackendV2(), return_metadata=True)
+
+    assert result.native_basis == "ibm"
+    assert equal_up_to_phase(Operator(qc).data, Operator(result.circuit).data)
+
+    gate_names = {instr.operation.name for instr in result.circuit.data}
+    assert gate_names <= {"rz", "sx", "x"}
+
+
+def test_ibm_backendv1_infers_ibm_basis() -> None:
+    """A BackendV1-style backend (configuration().basis_gates) also triggers ibm basis."""
+    qc = QuantumCircuit(1)
+    qc.rx(0.5, 0)
+    qc.ry(0.3, 0)
+
+    result = optimize(qc, backend=_FakeIBMBackendV1(), return_metadata=True)
+
+    assert result.native_basis == "ibm"
+    # Circuit is still equivalent.
+    assert equal_up_to_phase(Operator(qc).data, Operator(result.circuit).data)
+    # Note mentions inference.
+    assert any("inferred" in note for note in result.notes)
+
+
+def test_non_ibm_backend_falls_back_to_default() -> None:
+    """A backend without sx+rz in its gate set falls back to the compact U basis."""
+    qc = QuantumCircuit(1)
+    qc.rx(0.5, 0)
+    qc.ry(0.3, 0)
+    qc.rz(0.2, 0)
+
+    result = optimize(qc, backend=_FakeNonIBMBackend(), return_metadata=True)
+
+    # No basis inferred → defaults to None (U basis).
+    assert result.native_basis is None
+
+    gate_names = [instr.operation.name for instr in result.circuit.data]
+    assert gate_names == ["u"]
+
+    assert equal_up_to_phase(Operator(qc).data, Operator(result.circuit).data)
+
+
+def test_broken_backend_falls_back_cleanly() -> None:
+    """A backend object that throws on every access does not break optimization."""
+    qc = QuantumCircuit(1)
+    qc.rx(0.5, 0)
+    qc.ry(0.3, 0)
+
+    # Must not raise.
+    result = optimize(qc, backend=_BrokenBackend(), return_metadata=True)
+
+    assert result.native_basis is None
+    assert equal_up_to_phase(Operator(qc).data, Operator(result.circuit).data)
+
+
+def test_explicit_native_basis_overrides_backend_inference() -> None:
+    """An explicit native_basis always wins, even when a backend is provided."""
+    qc = QuantumCircuit(1)
+    qc.rx(0.5, 0)
+    qc.ry(0.3, 0)
+    qc.rz(0.2, 0)
+
+    # Pass an IBM-style backend but explicitly request zyz.
+    result = optimize(
+        qc, backend=_FakeIBMBackendV2(), native_basis="zyz", return_metadata=True
+    )
+
+    assert result.native_basis == "zyz"
+    gate_names = {instr.operation.name for instr in result.circuit.data}
+    assert gate_names <= {"rz", "ry"}
+
+    assert equal_up_to_phase(Operator(qc).data, Operator(result.circuit).data)
+
+
+def test_no_backend_no_native_basis_uses_u() -> None:
+    """Without backend or native_basis, the compact U basis is always used."""
+    qc = QuantumCircuit(1)
+    qc.rx(0.5, 0)
+    qc.ry(0.3, 0)
+    qc.rz(0.2, 0)
+
+    result = optimize(qc, return_metadata=True)
+
+    assert result.native_basis is None
+    gate_names = [instr.operation.name for instr in result.circuit.data]
+    assert gate_names == ["u"]
+
+
+# ---------------------------------------------------------------------------
 # Determinism
 # ---------------------------------------------------------------------------
 

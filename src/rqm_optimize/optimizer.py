@@ -68,7 +68,13 @@ def optimize(
 
     Args:
         circuit: A Qiskit ``QuantumCircuit``.  Other types raise ``TypeError``.
-        backend: Reserved for future backend-aware optimization.  Ignored in v0.
+        backend: Optional backend object.  When provided and ``native_basis``
+            is ``None``, the backend's reported gate set is inspected to
+            choose a suitable decomposition basis automatically.  Currently
+            IBM-style backends (those advertising ``sx`` and ``rz`` as native
+            gates) are detected and mapped to the ``"ibm"`` basis.  All other
+            backends fall back to the default compact ``"U"`` basis.  An
+            explicit ``native_basis`` argument always overrides inference.
         strategy: Optimization strategy.  Currently only ``"geodesic"`` is
             supported.
         native_basis: Optional preference for the decomposition basis used when
@@ -103,7 +109,7 @@ def optimize(
             f"Supported strategies: {sorted(_SUPPORTED_STRATEGIES)}."
         )
 
-    from .qiskit_adapter import NATIVE_BASIS_MAP, _DEFAULT_DECOMPOSER_BASIS
+    from .qiskit_adapter import NATIVE_BASIS_MAP, _DEFAULT_DECOMPOSER_BASIS, infer_native_basis_from_backend
 
     if native_basis is not None and native_basis not in NATIVE_BASIS_MAP:
         raise ValueError(
@@ -111,8 +117,18 @@ def optimize(
             f"Supported values: {sorted(NATIVE_BASIS_MAP)} or None."
         )
 
+    # When the caller does not specify a native_basis, try to infer one from
+    # the backend object.  An explicit native_basis always takes precedence.
+    inferred_basis: str | None = None
+    if native_basis is None and backend is not None:
+        inferred_basis = infer_native_basis_from_backend(backend)
+
+    # The basis that is actually applied: explicit > inferred > default.
+    effective_basis_name: str | None = native_basis if native_basis is not None else inferred_basis
     decomposer_basis = (
-        NATIVE_BASIS_MAP[native_basis] if native_basis is not None else _DEFAULT_DECOMPOSER_BASIS
+        NATIVE_BASIS_MAP[effective_basis_name]
+        if effective_basis_name is not None
+        else _DEFAULT_DECOMPOSER_BASIS
     )
 
     from .fusion import fuse_circuit
@@ -133,7 +149,19 @@ def optimize(
     if return_metadata:
         notes: list[str] = []
         if backend is not None:
-            notes.append("backend argument is reserved for future use and was ignored.")
+            if inferred_basis is not None and native_basis is None:
+                notes.append(
+                    f"native_basis '{inferred_basis}' was inferred from the backend "
+                    f"({type(backend).__name__}) and applied automatically."
+                )
+            elif native_basis is not None:
+                # Backend present but overridden by explicit native_basis — silent.
+                pass
+            else:
+                notes.append(
+                    "backend argument was provided but its gate set could not be "
+                    "determined; default decomposition was used."
+                )
         return OptimizationResult(
             circuit=optimized,
             original_gate_count=original_count,
@@ -144,7 +172,7 @@ def optimize(
             optimized_1q_gate_count=optimized_1q,
             fused_runs=fused_runs,
             strategy=strategy,
-            native_basis=native_basis,
+            native_basis=effective_basis_name,
             notes=notes,
         )
 

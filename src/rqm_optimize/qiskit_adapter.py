@@ -54,6 +54,60 @@ NATIVE_BASIS_MAP: dict[str, str] = {
 # The default decomposer basis when no native_basis is requested.
 _DEFAULT_DECOMPOSER_BASIS = "U"
 
+# Gate names that unambiguously identify an IBM-style hardware backend.
+# Both must be present in the backend's reported basis gate set.
+_IBM_INDICATOR_GATES = frozenset({"sx", "rz"})
+
+
+def infer_native_basis_from_backend(backend: object) -> str | None:
+    """Inspect *backend* and return a suitable ``native_basis`` string, or ``None``.
+
+    Heuristic:
+    - If the backend advertises ``sx`` and ``rz`` in its native gate set,
+      it is treated as IBM-style and ``"ibm"`` is returned.
+    - In all other cases — including backends whose gate set cannot be
+      determined — ``None`` is returned so the caller falls back to the
+      default compact ``"U"`` basis.
+
+    This function never raises: all backend API calls are guarded by a broad
+    ``except`` clause so that an unusual or mock backend cannot break
+    optimization.
+
+    Args:
+        backend: Any object passed as the ``backend`` argument to
+            :func:`~rqm_optimize.optimize`.
+
+    Returns:
+        ``"ibm"`` when the backend looks IBM-style, ``None`` otherwise.
+    """
+    gate_names: set[str] = set()
+
+    # Qiskit 1.x: BackendV2 exposes operation_names directly.
+    try:
+        names = backend.operation_names  # type: ignore[union-attr]
+        if names is not None:
+            gate_names.update(str(n) for n in names)
+    except Exception:  # noqa: BLE001
+        pass
+
+    # Qiskit 0.x: BackendV1 exposes configuration().basis_gates.
+    if not gate_names:
+        try:
+            cfg = backend.configuration()  # type: ignore[union-attr]
+            basis = cfg.basis_gates
+            if basis is not None:
+                gate_names.update(str(n) for n in basis)
+        except Exception:  # noqa: BLE001
+            pass
+
+    if not gate_names:
+        return None
+
+    if _IBM_INDICATOR_GATES <= gate_names:
+        return "ibm"
+
+    return None
+
 
 def is_fuseable_single_qubit(op: "Instruction") -> bool:
     """Return True if *op* is a single-qubit unitary gate that may be fused.

@@ -13,18 +13,26 @@ qc.rx(0.5, 0)
 qc.ry(0.3, 0)
 qc.rz(0.2, 0)
 qc.h(0)
-qc.rx(1.1, 0)
-qc.rz(0.8, 0)
+qc.s(0)
+qc.t(0)
 
 print("Original circuit:")
 print(qc)
-print(f"Original gate count: {len(qc.data)}")
 
-# Optimize with metadata.
+# Optimize with metadata (default compact U basis).
 result = optimize(qc, return_metadata=True)
 
-print("\nOptimized circuit:")
+print("\nOptimized circuit (U basis):")
 print(result.circuit)
-print(f"Optimized gate count: {result.optimized_gate_count}")
-print(f"Fused runs:           {result.fused_runs}")
-print(f"Strategy:             {result.strategy}")
+print(f"original gates:  {result.original_gate_count}  →  optimized gates:  {result.optimized_gate_count}")
+print(f"original depth:  {result.original_depth}  →  optimized depth:  {result.optimized_depth}")
+print(f"original 1q:     {result.original_1q_gate_count}  →  optimized 1q:     {result.optimized_1q_gate_count}")
+print(f"fused runs:      {result.fused_runs}")
+print(f"strategy:        {result.strategy}")
+
+# Same circuit using IBM-native basis (rz + sx).
+result_ibm = optimize(qc, native_basis="ibm", return_metadata=True)
+
+print("\nOptimized circuit (IBM native basis: rz + sx):")
+print(result_ibm.circuit)
+print(f"optimized gates: {result_ibm.optimized_gate_count}")

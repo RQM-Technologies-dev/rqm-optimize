@@ -38,6 +38,47 @@ def gate_count(circuit: "QuantumCircuit") -> int:
     return count
 
 
+def single_qubit_gate_count(circuit: "QuantumCircuit") -> int:
+    """Return the number of single-qubit gate instructions in *circuit*.
+
+    Measurements, barriers, and resets are excluded.
+
+    Args:
+        circuit: A Qiskit ``QuantumCircuit``.
+
+    Returns:
+        Integer count of single-qubit gate operations.
+    """
+    from qiskit.circuit import Barrier, Measure, Reset  # type: ignore[attr-defined]
+
+    count = 0
+    for instr in circuit.data:
+        op = instr.operation
+        if op.num_qubits == 1 and not isinstance(op, (Barrier, Measure, Reset)):
+            count += 1
+    return count
+
+
+def circuit_depth(circuit: "QuantumCircuit") -> int:
+    """Return the gate depth of *circuit*, excluding barriers and measurements.
+
+    Uses Qiskit's native depth calculation with a filter that ignores
+    barriers, measurements, and resets so the reported number reflects
+    genuine gate layers.
+
+    Args:
+        circuit: A Qiskit ``QuantumCircuit``.
+
+    Returns:
+        Integer circuit depth.
+    """
+    from qiskit.circuit import Barrier, Measure, Reset  # type: ignore[attr-defined]
+
+    return circuit.depth(
+        filter_function=lambda inst: not isinstance(inst.operation, (Barrier, Measure, Reset))
+    )
+
+
 def single_qubit_run_count(circuit: "QuantumCircuit") -> int:
     """Return the number of contiguous single-qubit gate runs in *circuit*.
 
@@ -96,3 +137,4 @@ def matrix_error_norm(
     from .geometry import remove_global_phase
 
     return float(np.linalg.norm(remove_global_phase(a) - remove_global_phase(b)))
+

@@ -155,7 +155,7 @@ def test_deep_single_qubit_run() -> None:
 
 
 # ---------------------------------------------------------------------------
-# metadata fields
+# metadata fields (including new depth and 1q gate count fields)
 # ---------------------------------------------------------------------------
 
 def test_optimization_result_fields() -> None:
@@ -168,9 +168,140 @@ def test_optimization_result_fields() -> None:
     assert isinstance(result.circuit, QuantumCircuit)
     assert isinstance(result.original_gate_count, int)
     assert isinstance(result.optimized_gate_count, int)
+    assert isinstance(result.original_depth, int)
+    assert isinstance(result.optimized_depth, int)
+    assert isinstance(result.original_1q_gate_count, int)
+    assert isinstance(result.optimized_1q_gate_count, int)
     assert isinstance(result.fused_runs, int)
     assert result.strategy == "geodesic"
+    assert result.native_basis is None
     assert isinstance(result.notes, list)
+
+
+def test_depth_fields_are_correct() -> None:
+    """Depth of a linear single-qubit chain must equal gate count."""
+    qc = QuantumCircuit(1)
+    qc.rx(0.5, 0)
+    qc.ry(0.3, 0)
+    qc.rz(0.2, 0)
+
+    result = optimize(qc, return_metadata=True)
+
+    # Original has 3 sequential single-qubit gates → depth 3.
+    assert result.original_depth == 3
+    assert result.original_1q_gate_count == 3
+
+    # Optimized fuses to 1 gate.
+    assert result.optimized_depth == 1
+    assert result.optimized_1q_gate_count == 1
+
+    # Depth is always ≤ original.
+    assert result.optimized_depth <= result.original_depth
+
+
+def test_depth_fields_with_multi_qubit_gate() -> None:
+    """CX creates depth; verify original_depth and optimized_depth are sane."""
+    qc = QuantumCircuit(2)
+    qc.h(0)
+    qc.cx(0, 1)
+    qc.rz(0.3, 1)
+    qc.rx(0.4, 1)
+
+    result = optimize(qc, return_metadata=True)
+
+    # Original: H, CX, Rz, Rx — depth 4 (serial on one path).
+    assert result.original_depth >= 3
+    assert result.optimized_depth >= 1
+    assert result.optimized_depth <= result.original_depth
+
+
+def test_1q_gate_count_excludes_cx() -> None:
+    qc = QuantumCircuit(2)
+    qc.rx(0.5, 0)
+    qc.cx(0, 1)
+    qc.ry(0.3, 1)
+
+    result = optimize(qc, return_metadata=True)
+
+    # Original has 2 single-qubit gates (Rx + Ry); CX is 2-qubit.
+    assert result.original_1q_gate_count == 2
+
+
+# ---------------------------------------------------------------------------
+# native_basis parameter
+# ---------------------------------------------------------------------------
+
+def test_native_basis_none_is_default() -> None:
+    qc = QuantumCircuit(1)
+    qc.rx(0.5, 0)
+    qc.ry(0.3, 0)
+    qc.rz(0.2, 0)
+
+    result = optimize(qc, native_basis=None, return_metadata=True)
+    assert result.native_basis is None
+
+    # Default basis produces a single U gate for a 3-gate run.
+    gate_names = [instr.operation.name for instr in result.circuit.data]
+    assert gate_names == ["u"]
+
+
+def test_native_basis_ibm_uses_rz_sx() -> None:
+    qc = QuantumCircuit(1)
+    qc.rx(0.5, 0)
+    qc.ry(0.3, 0)
+    qc.rz(0.2, 0)
+    qc.h(0)
+    qc.s(0)
+
+    result = optimize(qc, native_basis="ibm", return_metadata=True)
+
+    assert result.native_basis == "ibm"
+
+    # Verify equivalence.
+    orig_u = Operator(qc).data
+    opt_u = Operator(result.circuit).data
+    assert equal_up_to_phase(orig_u, opt_u)
+
+    # Output gates should only be rz and sx (IBM native set).
+    gate_names = {instr.operation.name for instr in result.circuit.data}
+    assert gate_names <= {"rz", "sx", "x"}
+
+
+def test_native_basis_zyz_uses_rz_ry() -> None:
+    qc = QuantumCircuit(1)
+    qc.rx(0.5, 0)
+    qc.ry(0.3, 0)
+    qc.rz(0.2, 0)
+
+    result = optimize(qc, native_basis="zyz", return_metadata=True)
+
+    assert result.native_basis == "zyz"
+
+    orig_u = Operator(qc).data
+    opt_u = Operator(result.circuit).data
+    assert equal_up_to_phase(orig_u, opt_u)
+
+    gate_names = {instr.operation.name for instr in result.circuit.data}
+    assert gate_names <= {"rz", "ry"}
+
+
+def test_native_basis_invalid_raises() -> None:
+    qc = QuantumCircuit(1)
+    qc.rx(0.1, 0)
+    with pytest.raises(ValueError, match="native_basis"):
+        optimize(qc, native_basis="not_a_basis")
+
+
+def test_native_basis_preserved_in_result_fields() -> None:
+    qc = QuantumCircuit(1)
+    qc.rx(0.5, 0)
+    qc.ry(0.3, 0)
+
+    result_ibm = optimize(qc, native_basis="ibm", return_metadata=True)
+    result_zyz = optimize(qc, native_basis="zyz", return_metadata=True)
+
+    assert result_ibm.native_basis == "ibm"
+    assert result_zyz.native_basis == "zyz"
 
 
 # ---------------------------------------------------------------------------
@@ -200,3 +331,4 @@ def test_deterministic_output() -> None:
     u1 = Operator(opt1).data
     u2 = Operator(opt2).data
     assert np.allclose(u1, u2)
+

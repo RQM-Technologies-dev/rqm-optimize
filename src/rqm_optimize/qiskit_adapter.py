@@ -42,6 +42,18 @@ _BOUNDARY_GATE_NAMES = frozenset(
     }
 )
 
+# Map user-facing native_basis names → OneQubitEulerDecomposer basis strings.
+# "U" is the default compact basis (single U gate per run).
+# "ibm" targets IBM hardware native gates: rz and sx.
+# "zyz" produces an analytic Rz-Ry-Rz decomposition.
+NATIVE_BASIS_MAP: dict[str, str] = {
+    "ibm": "ZSX",
+    "zyz": "ZYZ",
+}
+
+# The default decomposer basis when no native_basis is requested.
+_DEFAULT_DECOMPOSER_BASIS = "U"
+
 
 def is_fuseable_single_qubit(op: "Instruction") -> bool:
     """Return True if *op* is a single-qubit unitary gate that may be fused.
@@ -116,24 +128,26 @@ def emit_euler_gate(
     unitary: np.ndarray,
     circuit: "QuantumCircuit",
     qubit: "Qubit",
+    basis: str = _DEFAULT_DECOMPOSER_BASIS,
 ) -> int:
     """Decompose *unitary* and append the resulting gates onto *circuit*.
 
-    Uses Qiskit's ``OneQubitEulerDecomposer`` with the ``"U"`` basis to
-    produce a compact, exact decomposition.  The identity (up to phase) is
-    emitted as zero gates.
+    Uses Qiskit's ``OneQubitEulerDecomposer`` with the requested *basis* to
+    produce a compact, exact decomposition.
 
     Args:
         unitary: 2×2 complex SU(2)-normalised unitary matrix.
         circuit: The ``QuantumCircuit`` to append gates to.
         qubit: The target qubit.
+        basis: Euler decomposer basis string (e.g. ``"U"``, ``"ZSX"``,
+            ``"ZYZ"``).  Defaults to ``"U"`` for the most compact output.
 
     Returns:
-        Number of gates appended (0 or 1 for a U-basis decomposition).
+        Number of gates appended.
     """
     from qiskit.synthesis.one_qubit import OneQubitEulerDecomposer
 
-    decomposer = OneQubitEulerDecomposer(basis="U")
+    decomposer = OneQubitEulerDecomposer(basis=basis)
     decomposed = decomposer(unitary)
     before = len(circuit.data)
     for instr in decomposed.data:
@@ -144,6 +158,7 @@ def emit_euler_gate(
 def build_optimized_circuit(
     original: "QuantumCircuit",
     segments: list[dict],
+    basis: str = _DEFAULT_DECOMPOSER_BASIS,
 ) -> "QuantumCircuit":
     """Reconstruct a circuit from a list of *segments*.
 
@@ -159,6 +174,7 @@ def build_optimized_circuit(
     Args:
         original: The original ``QuantumCircuit`` (used for register structure).
         segments: Ordered list of segment descriptors.
+        basis: Euler decomposer basis string to use for fused runs.
 
     Returns:
         A new ``QuantumCircuit`` with the optimized instruction sequence.
@@ -180,7 +196,7 @@ def build_optimized_circuit(
             from qiskit import QuantumCircuit as QC
 
             tmp = QC(1)
-            emitted = emit_euler_gate(matrix, tmp, tmp.qubits[0])
+            emitted = emit_euler_gate(matrix, tmp, tmp.qubits[0], basis=basis)
 
             if emitted <= original_count:
                 # Decomposition is equal or better — use it.

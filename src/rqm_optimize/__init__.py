@@ -7,6 +7,13 @@ Public API::
     result = optimize(qc, return_metadata=True)
 """
 
+from importlib.metadata import PackageNotFoundError, version
+
+try:
+    __version__: str = version("rqm-optimize")
+except PackageNotFoundError:
+    __version__ = "unknown"
+
 from .optimizer import OptimizationResult, optimize
 
 __all__ = ["optimize", "OptimizationResult"]

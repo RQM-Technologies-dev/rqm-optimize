@@ -137,7 +137,7 @@ def test_roundtrip_arbitrary_su2() -> None:
             ],
             dtype=complex,
         )
-        # Normalise to SU(2) (det → +1).
+        # Normalize to SU(2) (det → +1).
         det = np.linalg.det(mat)
         mat /= np.sqrt(det)
 

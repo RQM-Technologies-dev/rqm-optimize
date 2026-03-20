@@ -113,15 +113,17 @@ def fuse_circuit(circuit: "QuantumCircuit") -> tuple[list[dict], int]:
 
 
 def _fuse_matrices(run: list["CircuitInstruction"]) -> np.ndarray:
-    """Fuse gate matrices via quaternion accumulation and return an SU(2) matrix.
+    """Accumulate a run of single-qubit gates as quaternion products on S³.
 
-    Each gate matrix is converted to a unit quaternion (the exact SU(2)
-    representation), the quaternions are multiplied in circuit order, and the
-    accumulated result is converted back to a 2×2 SU(2) matrix.
+    Each ``CircuitInstruction`` in *run* is inspected for its 2×2 unitary
+    matrix, which is then mapped to a unit quaternion via the exact SU(2)
+    isomorphism.  The quaternions are multiplied in circuit order (gate[0]
+    applied first), and the canonical accumulated result is converted back to
+    a 2×2 SU(2) matrix.
 
-    Using quaternion multiplication instead of direct matrix multiplication
-    keeps intermediate results on the unit 3-sphere S³, avoids accumulated
-    complex phase drift, and produces a canonical result via
+    Using quaternion multiplication instead of raw matrix multiplication keeps
+    intermediate results on the unit 3-sphere S³, avoids accumulated complex
+    phase drift, and produces a canonical output via
     :func:`~rqm_optimize.geometry.quaternion_canonicalize`.
 
     Circuit order: gate[0] is applied first.  Quaternion product ``q_n * … *
@@ -132,7 +134,7 @@ def _fuse_matrices(run: list["CircuitInstruction"]) -> np.ndarray:
         run: List of ``CircuitInstruction`` objects in circuit order.
 
     Returns:
-        2×2 SU(2)-normalised combined unitary matrix.
+        2×2 SU(2)-normalized combined unitary matrix.
     """
     # Identity quaternion: q = (1, 0, 0, 0).
     q_accum = np.array([1.0, 0.0, 0.0, 0.0])

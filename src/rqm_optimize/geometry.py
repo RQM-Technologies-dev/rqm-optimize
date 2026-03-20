@@ -240,3 +240,47 @@ def quaternion_to_axis_angle(
     else:
         axis = np.array(q[1:], dtype=float) / sin_half
     return axis, theta
+
+
+# Reference unit vectors for the three Cartesian rotation axes.
+_CARTESIAN_AXES: tuple[tuple[str, NDArray[np.floating]], ...] = (
+    ("x", np.array([1.0, 0.0, 0.0])),
+    ("y", np.array([0.0, 1.0, 0.0])),
+    ("z", np.array([0.0, 0.0, 1.0])),
+)
+
+# Default tolerance for axis-alignment checks.
+_AXIS_ATOL = 1e-6
+
+
+def axis_aligned_rotation(
+    q: NDArray[np.floating],
+    atol: float = _AXIS_ATOL,
+) -> tuple[str, float] | None:
+    """Return ``(axis_name, theta)`` if *q* is a rotation about x, y, or z.
+
+    Checks whether the rotation axis of *q* lies within *atol* of the x, y, or
+    z unit vector.  This is the geometric test that drives the axis-aware
+    compression pass: when the result is non-``None``, the caller can emit a
+    single named rotation gate (``rx``, ``ry``, or ``rz``) instead of a
+    generic ``U`` gate.
+
+    Near-identity rotations (``|theta| < atol``) return ``None`` because the
+    axis is numerically undefined at that scale.
+
+    Args:
+        q: Length-4 float array ``[w, x, y, z]``, a unit quaternion.
+        atol: Absolute tolerance for axis alignment and near-identity detection.
+
+    Returns:
+        ``("x"/"y"/"z", theta)`` when the axis is Cartesian-aligned, or
+        ``None`` when the rotation is generic or near-identity.
+    """
+    q = quaternion_canonicalize(q)
+    axis, theta = quaternion_to_axis_angle(q)
+    if abs(theta) < atol:
+        return None
+    for name, ref in _CARTESIAN_AXES:
+        if np.allclose(axis, ref, atol=atol):
+            return name, theta
+    return None

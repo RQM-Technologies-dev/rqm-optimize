@@ -11,7 +11,13 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from .geometry import remove_global_phase
+from .geometry import (
+    quaternion_canonicalize,
+    quaternion_multiply,
+    quaternion_to_su2,
+    remove_global_phase,
+    su2_to_quaternion,
+)
 from .qiskit_adapter import extract_matrix, is_fuseable_single_qubit
 
 if TYPE_CHECKING:
@@ -107,12 +113,20 @@ def fuse_circuit(circuit: "QuantumCircuit") -> tuple[list[dict], int]:
 
 
 def _fuse_matrices(run: list["CircuitInstruction"]) -> np.ndarray:
-    """Multiply gate matrices left-to-right (circuit order) and normalise.
+    """Fuse gate matrices via quaternion accumulation and return an SU(2) matrix.
 
-    In quantum circuit convention the first gate applied is the leftmost
-    matrix.  We accumulate U_n @ ... @ U_1 by applying right-to-left
-    composition so that the overall effect is the same as applying gates
-    sequentially.
+    Each gate matrix is converted to a unit quaternion (the exact SU(2)
+    representation), the quaternions are multiplied in circuit order, and the
+    accumulated result is converted back to a 2×2 SU(2) matrix.
+
+    Using quaternion multiplication instead of direct matrix multiplication
+    keeps intermediate results on the unit 3-sphere S³, avoids accumulated
+    complex phase drift, and produces a canonical result via
+    :func:`~rqm_optimize.geometry.quaternion_canonicalize`.
+
+    Circuit order: gate[0] is applied first.  Quaternion product ``q_n * … *
+    q_1`` is accumulated with the last gate on the left (outer position),
+    matching the matrix convention ``U_n @ … @ U_1``.
 
     Args:
         run: List of ``CircuitInstruction`` objects in circuit order.
@@ -120,11 +134,12 @@ def _fuse_matrices(run: list["CircuitInstruction"]) -> np.ndarray:
     Returns:
         2×2 SU(2)-normalised combined unitary matrix.
     """
-    # Start with identity and compose in circuit order.
-    # circuit order: gate[0] first, gate[1] second, ...
-    # combined unitary = gate[-1] @ ... @ gate[1] @ gate[0]
-    combined = np.eye(2, dtype=complex)
+    # Identity quaternion: q = (1, 0, 0, 0).
+    q_accum = np.array([1.0, 0.0, 0.0, 0.0])
     for instr in run:
         mat = extract_matrix(instr.operation)
-        combined = mat @ combined
-    return remove_global_phase(combined)
+        q_gate = su2_to_quaternion(remove_global_phase(mat))
+        # Apply q_gate after the current accumulation: q_gate * q_accum.
+        q_accum = quaternion_multiply(q_gate, q_accum)
+    q_accum = quaternion_canonicalize(q_accum)
+    return quaternion_to_su2(q_accum)

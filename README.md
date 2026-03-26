@@ -1,6 +1,6 @@
 # rqm-optimize
 
-> `rqm-optimize` is the SU(2)-aware optimization layer for the RQM ecosystem. It compresses contiguous single-qubit gate runs into shorter equivalent forms, reducing unnecessary depth while preserving circuit behavior up to global phase.
+> `rqm-optimize` is an optional, backend-adjacent SU(2)-aware compression layer for the RQM ecosystem. It compresses contiguous single-qubit gate runs into shorter equivalent forms, reducing unnecessary depth while preserving circuit behavior up to global phase. It operates on Qiskit `QuantumCircuit` objects after the compiler and lowering stages — it is not the primary optimization stage and does not own the public circuit schema.
 
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -9,27 +9,74 @@
 
 ## Purpose
 
-RQM is not only a representation layer — it is a **performance layer**.
+`rqm-optimize` is a practical SU(2)-aware compression layer for backend-native circuits.
+It operates after the circuit has already been lowered to a Qiskit `QuantumCircuit` — that is, after `rqm-compiler` optimization and `rqm-qiskit` lowering have already run.
 
-`rqm-optimize` accepts a Qiskit `QuantumCircuit`, scans it for contiguous single-qubit gate runs, fuses those runs into minimal SU(2)-equivalent operations, and returns a simplified circuit that is unitary-equivalent to the original up to global phase.
+It accepts a Qiskit `QuantumCircuit`, scans it for contiguous single-qubit gate runs, fuses those runs into minimal SU(2)-equivalent operations, and returns a simplified circuit that is unitary-equivalent to the original up to global phase.
+
+`rqm-optimize` is **complementary to** `rqm-compiler`, not a replacement for it:
+
+- **`rqm-compiler`** optimizes in its own internal circuit model, before lowering to a backend.
+- **`rqm-optimize`** compresses in backend-native / Qiskit circuit space, after lowering.
+
+Use `rqm-optimize` when you want an extra 1-qubit compression pass after the compiler and lowering stages.
+
+The canonical external/public circuit IR lives in `rqm-circuits` upstream. `rqm-optimize` does **not** consume or define the public wire format — it works on `QuantumCircuit` objects only.
 
 ---
 
 ## Stack placement
 
 ```text
-rqm-core      → canonical quaternion / SU(2) / Bloch math
-rqm-compiler  → circuit construction / normalization
+rqm-core      → math foundation (quaternion / SU(2) / Bloch)
+rqm-circuits  → canonical external/public circuit IR
+rqm-compiler  → internal optimization / rewriting engine
 rqm-qiskit    → Qiskit lowering / execution bridge
 rqm-braket    → Braket lowering / execution bridge
-rqm-optimize  → optimization / compression layer  ← this package
+rqm-optimize  → optional backend-adjacent optimization / compression layer  ← this package
 ```
 
-The intended end-to-end workflow is:
+`rqm-optimize` is downstream of `rqm-circuits`, `rqm-compiler`, and usually `rqm-qiskit`.
+It is an **optional** later-stage pass — the rest of the stack functions without it.
+
+---
+
+## Typical data flow
 
 ```text
-construct (rqm-compiler) → lower (rqm-qiskit) → optimize (rqm-optimize) → run
+Studio / API / SDK
+    ↓
+rqm-circuits payload  (public circuit IR — parsed/validated upstream)
+    ↓
+rqm-compiler          (internal optimization / rewriting)
+    ↓
+rqm-qiskit            (lowering to Qiskit QuantumCircuit)
+    ↓
+rqm-optimize          (optional: backend-adjacent 1-qubit compression)
+    ↓
+backend run
 ```
+
+Some users also call `rqm-optimize` directly on a hand-written Qiskit `QuantumCircuit` without going through the full stack — that is a fully supported and practical mode of use.
+
+---
+
+## What rqm-optimize owns / does not own
+
+**Owns:**
+
+- Backend-adjacent single-qubit compression in Qiskit circuit space
+- SU(2)-aware fusion of contiguous one-qubit runs
+- Optional native-basis preferences for emitted decompositions (`ibm`, `zyz`)
+- Optimization metadata about that compression step (`OptimizationResult`)
+
+**Does NOT own:**
+
+- Canonical external/public circuit schema → `rqm-circuits`
+- Compiler rewrite / canonicalization logic → `rqm-compiler`
+- Quaternion / SU(2) / Bloch / spinor math primitives → `rqm-core`
+- API wire format → `rqm-api`
+- Studio payload format → Studio + `rqm-api`
 
 ---
 
@@ -50,6 +97,8 @@ pip install -e ".[dev]"
 ---
 
 ## Quickstart
+
+This example shows **direct backend-native usage** — passing a hand-written Qiskit `QuantumCircuit` directly to `optimize`. This is a real and useful mode, though not the canonical ecosystem entry point (which starts at an `rqm-circuits` payload parsed upstream).
 
 ```python
 from qiskit import QuantumCircuit
@@ -75,10 +124,17 @@ print(result.circuit)
 
 ### Compiler-path integration
 
+API and Studio users typically originate in `rqm-circuits` upstream. By the time `rqm-optimize` is called, the circuit has already crossed the public IR boundary (parsed from an `rqm-circuits` payload) and the compiler boundary (`rqm-compiler` optimization). `rqm-optimize` is a later-stage, backend-adjacent compression pass applied after `rqm-qiskit` lowering:
+
+```text
+public circuit (rqm-circuits) → optimize in compiler space (rqm-compiler)
+    → lower to Qiskit (rqm-qiskit) → optional backend-native compression (rqm-optimize) → run
+```
+
 If you are using `rqm-compiler` to construct circuits and `rqm-qiskit` to lower them to Qiskit, pass the lowered circuit directly to `optimize`:
 
 ```python
-# construct → lower → optimize → run
+# public IR → compile → lower → optional compress → run
 from rqm_qiskit import to_qiskit       # rqm-qiskit lowering bridge
 from rqm_optimize import optimize
 

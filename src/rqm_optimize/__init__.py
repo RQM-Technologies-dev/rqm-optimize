@@ -1,4 +1,10 @@
-"""rqm-optimize — SU(2)-aware circuit compression for quantum workflows.
+"""rqm-optimize — optional backend-adjacent SU(2)-aware compression for quantum workflows.
+
+rqm-optimize is a later-stage compression pass that operates on Qiskit
+``QuantumCircuit`` objects, downstream of ``rqm-circuits`` (public IR),
+``rqm-compiler`` (internal optimization), and usually ``rqm-qiskit`` (lowering).
+It does not own the canonical public circuit schema and is not a replacement
+for rqm-compiler.
 
 Public API::
 

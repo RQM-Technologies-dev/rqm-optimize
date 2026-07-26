@@ -3,7 +3,7 @@
 > `rqm-optimize` is an optional, backend-adjacent SU(2)-aware compression layer for the RQM ecosystem. It compresses contiguous single-qubit gate runs into shorter equivalent forms, reducing unnecessary depth while preserving circuit behavior up to global phase. It operates on Qiskit `QuantumCircuit` objects after the compiler and lowering stages — it is not the primary optimization stage and does not own the public circuit schema.
 
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
 ---
 
@@ -275,4 +275,4 @@ rqm-noise        → quaternionic noise and error modeling        (future)
 
 ## License
 
-MIT © RQM Technologies
+Apache License 2.0 — see [LICENSE](LICENSE).

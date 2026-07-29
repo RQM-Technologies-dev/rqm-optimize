@@ -90,8 +90,8 @@ Some users also call `rqm-optimize` directly on a hand-written Qiskit `QuantumCi
 - Canonical external/public circuit schema → `rqm-circuits`
 - Compiler rewrite / canonicalization logic → `rqm-compiler`
 - Quaternion / SU(2) / Bloch / spinor math primitives → `rqm-core`
-- API wire format → `rqm-api`
-- Studio payload format → Studio + `rqm-api`
+- API wire format → `quantum-compiler-api`
+- Studio payload format → Studio + `quantum-compiler-api`
 
 ---
 

@@ -7,11 +7,18 @@
 
 ---
 
-## Better Coordinates for Better Measurement
+## Standard-Compatible Quaternion Coordinates
 
-This project uses quaternions because they preserve more of what physical systems are doing: phase, rotation, orientation, polarization, and coherence. Standard complex-number methods are powerful, but they can flatten these relationships too early. Quaternionic coordinates keep them together as one structured object, giving software a richer view of the measured system.
+A complete quaternion and a complete conventional complex/SU(2) or matrix
+representation carry the same transformation information. RQM uses
+quaternions because they make ordered rotation composition, inverses,
+normalization, sign handling, residuals, canonicalization, and lowering
+explicit in one structured coordinate system.
 
-For RQM Technologies, better coordinates mean better measurement: more informative diagnostics, cleaner transformations, and more precise control across quantum, wave, sensing, imaging, and communications workflows.
+Any claimed benefit must come from a measured implementation or workflow—not
+from additional physics or information in the representation. This package
+does not claim quantum-state compression, unique measurement, lower hardware
+error, or universal compiler superiority.
 
 ---
 

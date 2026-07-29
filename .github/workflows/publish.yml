@@ -3,11 +3,17 @@ name: Publish to PyPI
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: Existing v-prefixed GitHub release tag to publish
+        required: true
+        type: string
 
 permissions: {}
 
 concurrency:
-  group: pypi-${{ github.event.release.tag_name }}
+  group: pypi-${{ inputs.tag_name || github.event.release.tag_name }}
   cancel-in-progress: false
 
 jobs:
@@ -19,7 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ inputs.tag_name || github.event.release.tag_name }}
 
       - uses: actions/setup-python@v7
         with:
@@ -37,7 +43,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ inputs.tag_name || github.event.release.tag_name }}
 
       - uses: actions/setup-python@v7
         with:
@@ -48,8 +54,10 @@ jobs:
       - run: python -m twine check dist/*
 
       - name: Require release tag to match artifact version
+        env:
+          RELEASE_TAG: ${{ inputs.tag_name || github.event.release.tag_name }}
         run: |
-          expected="${GITHUB_REF_NAME#v}"
+          expected="${RELEASE_TAG#v}"
           actual="$(python -c 'import glob, pathlib; print(pathlib.Path(glob.glob("dist/*.whl")[0]).name.split("-")[1])')"
           test "$actual" = "$expected"
 
@@ -60,7 +68,7 @@ jobs:
 
   publish:
     name: Publish to PyPI
-    needs: build
+    needs: [build, attest]
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -75,9 +83,29 @@ jobs:
 
       - uses: pypa/gh-action-pypi-publish@release/v1
 
+  attest:
+    name: Attest release artifacts
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+
+      - uses: actions/attest@v4
+        with:
+          subject-path: |
+            dist/*.whl
+            dist/*.tar.gz
+
   attach:
     name: Attach distributions to GitHub Release
-    needs: build
+    needs: [build, attest]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -91,6 +119,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.tag_name || github.event.release.tag_name }}
         run: |
           (cd dist && sha256sum * > SHA256SUMS)
-          gh release upload "$GITHUB_REF_NAME" dist/*
+          gh release upload "$RELEASE_TAG" dist/* --clobber

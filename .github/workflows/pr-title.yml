@@ -3,6 +3,12 @@ name: Conventional pull request title
 on:
   pull_request_target:
     types: [opened, edited, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      pr_title:
+        description: Pull request title to validate
+        required: true
+        type: string
 
 permissions: {}
 
@@ -13,7 +19,7 @@ jobs:
     steps:
       - name: Validate title
         env:
-          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_TITLE: ${{ github.event.pull_request.title || inputs.pr_title }}
         run: |
           pattern='^(feat|fix|perf|refactor|docs|test|build|ci|chore|revert)(\([[:alnum:]_.\/-]+\))?!?: .+$'
           if ! printf '%s\n' "$PR_TITLE" | grep -Eq "$pattern"; then

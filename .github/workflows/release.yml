@@ -22,14 +22,24 @@ jobs:
     steps:
       - name: Run Release Please
         id: release
-        uses: googleapis/release-please-action@v4
+        uses: googleapis/release-please-action@v5
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+      - name: Dispatch CI for the release pull request
+        if: ${{ steps.release.outputs.pr != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_PR: ${{ steps.release.outputs.pr }}
+        run: |
+          pr_number="$(jq -r '.number' <<<"$RELEASE_PR")"
+          pr_branch="$(gh pr view "$pr_number" --json headRefName --jq .headRefName)"
+          gh workflow run ci.yml --ref "$pr_branch"
 
       - name: Dispatch protected PyPI publication
         if: ${{ steps.release.outputs.release_created == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ steps.release.outputs.tag_name }}
-        run: gh workflow run publish.yml --ref main --field tag_name="$RELEASE_TAG"
+        run: gh workflow run publish.yml --ref "$RELEASE_TAG" --field tag_name="$RELEASE_TAG"

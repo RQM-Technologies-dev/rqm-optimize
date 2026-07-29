@@ -4,6 +4,9 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    commit-message:
+      prefix: build
+      include: scope
     groups:
       python-dependencies:
         patterns: ["*"]
@@ -13,6 +16,9 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    commit-message:
+      prefix: build
+      include: scope
     groups:
       github-actions:
         patterns: ["*"]

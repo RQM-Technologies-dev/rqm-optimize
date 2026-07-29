@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.1.3](https://github.com/RQM-Technologies-dev/rqm-optimize/compare/v0.1.2...v0.1.3) (2026-07-29)
+
+
+### Bug Fixes
+
+* dispatch protected publication by repository ([#12](https://github.com/RQM-Technologies-dev/rqm-optimize/issues/12)) ([3e63eae](https://github.com/RQM-Technologies-dev/rqm-optimize/commit/3e63eae897a1115ff030bbd536e05724fb31a73a))
+* dispatch release pull request CI reliably ([#8](https://github.com/RQM-Technologies-dev/rqm-optimize/issues/8)) ([6d3fbe1](https://github.com/RQM-Technologies-dev/rqm-optimize/commit/6d3fbe17a4cc676acdd8f42811f37b845c7c26d7))
+* keep generated releases verifiable ([#10](https://github.com/RQM-Technologies-dev/rqm-optimize/issues/10)) ([e85eaa0](https://github.com/RQM-Technologies-dev/rqm-optimize/commit/e85eaa0358069d3b03ba82afae0a6aedfbf021ae))
+
+
+### Documentation
+
+* correct quaternion information claims ([#11](https://github.com/RQM-Technologies-dev/rqm-optimize/issues/11)) ([c8e0c26](https://github.com/RQM-Technologies-dev/rqm-optimize/commit/c8e0c26f579e68446f9949114c8ac30229471d42))
+
 ## [0.1.0] – 2026-03-18
 
 ### Added

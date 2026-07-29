@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "rqm-optimize"
-version = "0.1.2"
+version = "0.1.3"
 description = "SU(2)-aware circuit compression for quantum workflows"
 readme = "README.md"
 license = { text = "Apache-2.0" }

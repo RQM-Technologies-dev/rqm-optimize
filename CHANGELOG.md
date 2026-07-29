@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.1.4](https://github.com/RQM-Technologies-dev/rqm-optimize/compare/v0.1.3...v0.1.4) (2026-07-29)
+
+
+### Documentation
+
+* point optimizer formats to the canonical API ([#13](https://github.com/RQM-Technologies-dev/rqm-optimize/issues/13)) ([09a17b5](https://github.com/RQM-Technologies-dev/rqm-optimize/commit/09a17b5c045e6a368d74a0a3af17165e48e66a0b))
+
 ## [0.1.3](https://github.com/RQM-Technologies-dev/rqm-optimize/compare/v0.1.2...v0.1.3) (2026-07-29)
 
 

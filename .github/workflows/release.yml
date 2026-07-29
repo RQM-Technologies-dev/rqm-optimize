@@ -35,7 +35,9 @@ jobs:
         run: |
           pr_number="$(jq -r '.number' <<<"$RELEASE_PR")"
           pr_branch="$(gh pr view "$pr_number" --repo "$GITHUB_REPOSITORY" --json headRefName --jq .headRefName)"
+          pr_title="$(jq -r '.title' <<<"$RELEASE_PR")"
           gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$pr_branch"
+          gh workflow run pr-title.yml --repo "$GITHUB_REPOSITORY" --ref "$pr_branch" --field pr_title="$pr_title"
 
       - name: Dispatch protected PyPI publication
         if: ${{ steps.release.outputs.release_created == 'true' }}

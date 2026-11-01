@@ -1,6 +1,6 @@
 # rqm-optimize
 
-> `rqm-optimize` is an optional, backend-adjacent SU(2)-aware compression layer for the RQM ecosystem. It compresses contiguous single-qubit gate runs into shorter equivalent forms, reducing unnecessary depth while preserving circuit behavior up to global phase. It operates on Qiskit `QuantumCircuit` objects after the compiler and lowering stages — it is not the primary optimization stage and does not own the public circuit schema.
+> `rqm-optimize` is an optional, backend-adjacent SU(2)-aware compression layer for the RQM ecosystem. It compresses contiguous single-qubit gate runs into shorter equivalent forms, reducing unnecessary depth while preserving the full circuit operator, including scalar phase (see the local candidate prerequisites below). It operates on Qiskit `QuantumCircuit` objects after the compiler and lowering stages — it is not the primary optimization stage and does not own the public circuit schema.
 
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
@@ -94,6 +94,12 @@ Some users also call `rqm-optimize` directly on a hand-written Qiskit `QuantumCi
 - Studio payload format → Studio + `rqm-api`
 
 ---
+
+## Local exact-phase candidate
+
+See [LOCAL_QUALIFICATION.md](LOCAL_QUALIFICATION.md) for the required unreleased
+core source profile, test coverage and unresolved dependency/publication gates.
+This checkout is not yet qualified as a standalone installed distribution.
 
 ## Installation
 

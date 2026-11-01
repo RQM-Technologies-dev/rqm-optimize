@@ -1,40 +1,40 @@
-# Exact composable fusion: local source candidate
+# Exact composable fusion qualification
 
-This candidate preserves input circuit scalar phase, accumulates U(2) scalar
-phase separately from signed quaternion composition, and carries Qiskit Euler
-decomposition phase into the output. Euler simplification is disabled so tiny
-rotations are not dropped by a simplification tolerance. A rejected decomposition
-retains the original instructions without adding its temporary phase.
+This change preserves input circuit scalar phase, accumulates U(2) scalar phase
+separately from signed quaternion composition, and carries Qiskit Euler
+phase into the output. Euler simplification is disabled so tiny rotations are
+not dropped by its simplification tolerance. A rejected decomposition retains
+the original instructions without adding its temporary phase.
 
-The qualified core source is `rqm-core` commit
-`6a1c4841528a431a662d2db6aa19503891223078`, based on upstream
-`53e7a60b269eb80708afe8a4e28faf45c793531a`. Its exact signed export and tiny-angle
-semantics are required; merely finding the same helper names in an older package
-is not sufficient. It is an unreleased source candidate with unchanged version
-0.3.0. No released core dependency has been selected for this optimizer patch.
+## Published dependency and compatibility
 
-## Publication gates
+The required implementation is published in `rqm-core` 0.3.1; this package
+requires `rqm-core>=0.3.1,<0.4`. The qualified public PyPI wheel SHA256 is
+`443f3f702fad31989b054fa7734cb0cdcff807b251e77ab8a4565a64d91ab48b`.
+It contains the signed-export and tiny-angle behavior first qualified at core
+source commit `6a1c4841528a431a662d2db6aa19503891223078`.
 
-This is not an installable/release-qualified profile. Before merging or releasing:
+Python support is now >=3.10, matching core's minimum. Python 3.9 is removed
+from the declared classifiers and CI matrix. This is an explicit compatibility
+change, not a skipped test. Optimizer version remains 0.1.3 on the feature branch;
+Release Please owns the subsequent release version.
 
-1. Select a published core version containing the qualified changes and declare
-   it in package dependencies. Do not reuse the exploratory `core==0.2.3` pin or
-   assume the unchanged candidate version identifies the patch.
-2. Reconcile the optimizer's Python >=3.9 declaration/CI matrix with core's
-   Python >=3.10 requirement, explicitly documenting any support change.
-3. Test a clean installed distribution with the selected dependency, all supported
-   Python/Qiskit profiles, and package build/metadata checks.
+## Validation
 
-No version bump, dependency lock, CI/release change or publication is made here.
-The existing main-push workflow invokes Release Please; creating a release can
-trigger the protected publication workflow. A source qualification is not
-permission to create that release.
+The source profile passed 134 tests. A separate Python 3.12 environment also
+passes all 134 tests using built optimizer and published core wheels installed
+into site-packages, without PYTHONPATH/source overlays. This includes 33 exact
+phase regressions covering composition, inverse, controlled embedding and QPY
+serialization, plus independent Pauli-exponential checks down to 1e-12 rotations
+at 2e-15 absolute tolerance. Controlled tests use Qiskit circuit gates; they do
+not qualify a controlled core serializer. On unchanged upstream, 32 of these
+33 new checks failed, demonstrating the repaired defects.
 
-## Local qualification
+The isolated installed profile passes pip dependency consistency checking,
+sdist/wheel build and twine metadata checks. Linux Python 3.10–3.12 CI must still
+pass on the final integrated commit. The earlier draft CI failed because core
+was undeclared; Python 3.9 separately failed runner setup before tests. Those
+historical failures are preserved in the external qualification evidence.
 
-With source directories for this candidate and the exact core commit on
-`PYTHONPATH`, the existing qualification environment passes 134 tests, including
-33 exact-phase regressions. Those tests cover circuit composition, inverse,
-controlled embedding and QPY serialization, plus independent Pauli-exponential
-checks down to 1e-12 rotations at 2e-15 absolute tolerance. No controlled-core
-serializer capability is implied: controlled tests use Qiskit circuit gates.
+No publication is performed by local qualification. Main pushes invoke Release
+Please; its release PR must include the final dependency fix before release.

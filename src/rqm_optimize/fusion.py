@@ -11,13 +11,6 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from .geometry import (
-    quaternion_canonicalize,
-    quaternion_multiply,
-    quaternion_to_su2,
-    remove_global_phase,
-    su2_to_quaternion,
-)
 from .qiskit_adapter import extract_matrix, is_fuseable_single_qubit
 
 if TYPE_CHECKING:
@@ -113,35 +106,14 @@ def fuse_circuit(circuit: "QuantumCircuit") -> tuple[list[dict], int]:
 
 
 def _fuse_matrices(run: list["CircuitInstruction"]) -> np.ndarray:
-    """Accumulate a run of single-qubit gates as quaternion products on S³.
+    """Compose exact U(2) gates using core quaternion factors and scalar phase."""
+    from rqm_core.quaternion import Quaternion
+    from rqm_core.su2 import factor_u2_global_phase, su2_to_quaternion, quaternion_to_su2
 
-    Each ``CircuitInstruction`` in *run* is inspected for its 2×2 unitary
-    matrix, which is then mapped to a unit quaternion via the exact SU(2)
-    isomorphism.  The quaternions are multiplied in circuit order (gate[0]
-    applied first), and the canonical accumulated result is converted back to
-    a 2×2 SU(2) matrix.
-
-    Using quaternion multiplication instead of raw matrix multiplication keeps
-    intermediate results on the unit 3-sphere S³, avoids accumulated complex
-    phase drift, and produces a canonical output via
-    :func:`~rqm_optimize.geometry.quaternion_canonicalize`.
-
-    Circuit order: gate[0] is applied first.  Quaternion product ``q_n * … *
-    q_1`` is accumulated with the last gate on the left (outer position),
-    matching the matrix convention ``U_n @ … @ U_1``.
-
-    Args:
-        run: List of ``CircuitInstruction`` objects in circuit order.
-
-    Returns:
-        2×2 SU(2)-normalized combined unitary matrix.
-    """
-    # Identity quaternion: q = (1, 0, 0, 0).
-    q_accum = np.array([1.0, 0.0, 0.0, 0.0])
+    q_accum = Quaternion(1.0, 0.0, 0.0, 0.0)
+    phase = 0.0
     for instr in run:
-        mat = extract_matrix(instr.operation)
-        q_gate = su2_to_quaternion(remove_global_phase(mat))
-        # Apply q_gate after the current accumulation: q_gate * q_accum.
-        q_accum = quaternion_multiply(q_gate, q_accum)
-    q_accum = quaternion_canonicalize(q_accum)
-    return quaternion_to_su2(q_accum)
+        gate_phase, special = factor_u2_global_phase(extract_matrix(instr.operation))
+        phase += gate_phase
+        q_accum = (su2_to_quaternion(special) * q_accum).normalize()
+    return np.exp(1j * phase) * quaternion_to_su2(q_accum)

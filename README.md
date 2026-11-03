@@ -1,8 +1,8 @@
 # rqm-optimize
 
-> `rqm-optimize` is an optional, backend-adjacent SU(2)-aware compression layer for the RQM ecosystem. It compresses contiguous single-qubit gate runs into shorter equivalent forms, reducing unnecessary depth while preserving circuit behavior up to global phase. It operates on Qiskit `QuantumCircuit` objects after the compiler and lowering stages — it is not the primary optimization stage and does not own the public circuit schema.
+> `rqm-optimize` is an optional, backend-adjacent SU(2)-aware compression layer for the RQM ecosystem. It compresses contiguous single-qubit gate runs into shorter equivalent forms, reducing unnecessary depth while preserving the full circuit operator, including scalar phase (see the qualification notes below). It operates on Qiskit `QuantumCircuit` objects after the compiler and lowering stages — it is not the primary optimization stage and does not own the public circuit schema.
 
-[![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
 ---
@@ -94,6 +94,13 @@ Some users also call `rqm-optimize` directly on a hand-written Qiskit `QuantumCi
 - Studio payload format → Studio + `rqm-api`
 
 ---
+
+## Exact-phase dependency and compatibility
+
+The exact-phase implementation requires `rqm-core>=0.3.1,<0.4` and Python 3.10
+or newer. Python 3.9 is no longer supported because the canonical core dependency
+requires Python 3.10. See [LOCAL_QUALIFICATION.md](LOCAL_QUALIFICATION.md) for
+source and installed-wheel qualification, including remaining release checks.
 
 ## Installation
 

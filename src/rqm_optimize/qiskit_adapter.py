@@ -33,15 +33,6 @@ _KNOWN_SINGLE_QUBIT_GATE_NAMES = frozenset(
     }
 )
 
-# Gate classes that are hard boundaries — never fuse across these.
-_BOUNDARY_GATE_NAMES = frozenset(
-    {
-        "barrier",
-        "measure",
-        "reset",
-    }
-)
-
 # Map user-facing native_basis names → OneQubitEulerDecomposer basis strings.
 # "U" is the default compact basis (single U gate per run).
 # "ibm" targets IBM hardware native gates: rz and sx.

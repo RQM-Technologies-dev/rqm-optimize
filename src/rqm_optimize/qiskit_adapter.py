@@ -179,7 +179,7 @@ def emit_axis_aligned_gate(
     Inspects the quaternion representation of *matrix* to determine whether the
     fused rotation is aligned with the x, y, or z axis on S³.  When it is, a
     single named rotation gate (``rx``, ``ry``, or ``rz``) is appended to
-    *circuit* and 1 is returned.  When the rotation is generic or near-identity,
+    *circuit* and 1 is returned.  When the rotation requires more than one named gate,
     the circuit is left unchanged and 0 is returned.
 
     This is the axis-aware compression pass: it operates directly on the S³
@@ -188,26 +188,22 @@ def emit_axis_aligned_gate(
     virtual/"free" on many backends).
 
     Args:
-        matrix: 2×2 SU(2)-normalized unitary matrix for the fused run.
+        matrix: Exact 2×2 U(2) matrix for the fused run, including scalar phase.
         circuit: Target ``QuantumCircuit`` to append the gate to.
         qubit: The target qubit.
 
     Returns:
         1 if an axis-aligned gate was emitted, 0 otherwise.
     """
-    from .geometry import axis_aligned_rotation, su2_to_quaternion
+    from rqm_core.su2 import factor_u2_global_phase, su2_to_named_gate_sequence
 
-    q = su2_to_quaternion(matrix)
-    result = axis_aligned_rotation(q)
-    if result is None:
+    phase, special = factor_u2_global_phase(matrix)
+    sequence = su2_to_named_gate_sequence(special)
+    if len(sequence) != 1:
         return 0
-    axis_name, theta = result
-    if axis_name == "x":
-        circuit.rx(theta, qubit)
-    elif axis_name == "y":
-        circuit.ry(theta, qubit)
-    else:
-        circuit.rz(theta, qubit)
+    name, angle = sequence[0]
+    getattr(circuit, name.lower())(angle, qubit)
+    circuit.global_phase += phase
     return 1
 
 
@@ -223,7 +219,7 @@ def emit_euler_gate(
     produce a compact, exact decomposition.
 
     Args:
-        unitary: 2×2 complex SU(2)-normalized unitary matrix.
+        unitary: Exact 2×2 complex U(2) matrix, including scalar phase.
         circuit: The ``QuantumCircuit`` to append gates to.
         qubit: The target qubit.
         basis: Euler decomposer basis string (e.g. ``"U"``, ``"ZSX"``,
@@ -235,7 +231,8 @@ def emit_euler_gate(
     from qiskit.synthesis.one_qubit import OneQubitEulerDecomposer
 
     decomposer = OneQubitEulerDecomposer(basis=basis)
-    decomposed = decomposer(unitary)
+    decomposed = decomposer(unitary, simplify=False)
+    circuit.global_phase += decomposed.global_phase
     before = len(circuit.data)
     for instr in decomposed.data:
         circuit.append(instr.operation, [qubit])
@@ -270,6 +267,8 @@ def build_optimized_circuit(
 
     out = QuantumCircuit(*original.qregs, *original.cregs, name=original.name)
 
+    out.global_phase = original.global_phase
+
     for seg in segments:
         if seg["type"] == "passthrough":
             instr = seg["instruction"]
@@ -287,6 +286,7 @@ def build_optimized_circuit(
             # This always produces 1 gate (≤ original_count which is ≥ 2).
             tmp = QC(1)
             if emit_axis_aligned_gate(matrix, tmp, tmp.qubits[0]) > 0:
+                out.global_phase += tmp.global_phase
                 for instr in tmp.data:
                     out.append(instr.operation, [qubit])
                 continue
@@ -296,6 +296,7 @@ def build_optimized_circuit(
             emitted = emit_euler_gate(matrix, tmp, tmp.qubits[0], basis=basis)
 
             if emitted <= original_count:
+                out.global_phase += tmp.global_phase
                 # Decomposition is equal or better — use it.
                 for instr in tmp.data:
                     out.append(instr.operation, [qubit])
